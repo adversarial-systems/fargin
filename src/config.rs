@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use toml;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -12,16 +12,6 @@ pub struct ProjectConfig {
     pub description: String,
     pub created_at: DateTime<Utc>,
     pub last_updated: DateTime<Utc>,
-    pub goals: Vec<String>,
-    pub progress_markers: Vec<ProgressMarker>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProgressMarker {
-    pub name: String,
-    pub description: String,
-    pub completed: bool,
-    pub completed_at: Option<DateTime<Utc>>,
 }
 
 impl ProjectConfig {
@@ -31,17 +21,28 @@ impl ProjectConfig {
             description,
             created_at: Utc::now(),
             last_updated: Utc::now(),
-            goals: Vec::new(),
-            progress_markers: Vec::new(),
         }
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
         let config_dir = path.join(".fargin");
         fs::create_dir_all(&config_dir)?;
+
         let config_path = config_dir.join("config.toml");
         let config_str = toml::to_string_pretty(self)?;
-        fs::write(config_path, config_str)?;
+
+        // Ensure we write with full permissions
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&config_dir)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&config_dir, perms)?;
+        }
+
+        fs::write(&config_path, config_str)?;
+
+        println!("Project configuration saved to: {}", config_path.display());
         Ok(())
     }
 
@@ -54,203 +55,367 @@ impl ProjectConfig {
     }
 }
 
-/// Project development lifecycle configuration
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DevCycleConfig {
-    /// Formatting tool and configuration
-    pub format: FormatConfig,
+/// Initialize a new Rust project using Cargo
+pub fn init_rust_project(
+    name: String,
+    path: PathBuf,
+    cargo_bin: String,
+    template: Option<String>,
+    with_fargin: bool,
+    dry_run: bool,
+) -> Result<()> {
+    // Ensure path is relative to project root
+    let project_root = std::env::current_dir()?;
+    let absolute_path = project_root.join(path);
 
-    /// Linting tool and configuration
-    pub lint: LintConfig,
+    println!(
+        "Initializing Rust project: {} in project path: {}",
+        name,
+        absolute_path.display()
+    );
 
-    /// Testing configuration
-    pub test: TestConfig,
-
-    /// Git hooks for enforcing development practices
-    pub git_hooks: GitHooksConfig,
-}
-
-/// Formatting configuration
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FormatConfig {
-    /// Formatting tool (e.g., rustfmt)
-    pub tool: String,
-
-    /// Configuration file for formatting
-    pub config_file: Option<String>,
-
-    /// Whether formatting is mandatory before commits
-    pub mandatory: bool,
-}
-
-/// Linting configuration
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LintConfig {
-    /// Linting tool (e.g., clippy)
-    pub tool: String,
-
-    /// Linting configuration file
-    pub config_file: Option<String>,
-
-    /// Severity levels to enforce
-    pub severity_levels: Vec<String>,
-
-    /// Whether linting is mandatory
-    pub mandatory: bool,
-}
-
-/// Testing configuration
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TestConfig {
-    /// Test runner (e.g., cargo test)
-    pub runner: String,
-
-    /// Minimum test coverage percentage
-    pub min_coverage: Option<f32>,
-
-    /// Types of tests to run
-    pub test_types: Vec<String>,
-
-    /// Whether tests are mandatory before commits
-    pub mandatory: bool,
-}
-
-/// Git hooks configuration
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GitHooksConfig {
-    /// Pre-commit hooks to enforce development practices
-    pub pre_commit: Vec<String>,
-
-    /// Pre-push hooks for additional checks
-    pub pre_push: Vec<String>,
-}
-
-/// Default development cycle configuration
-impl Default for DevCycleConfig {
-    fn default() -> Self {
-        DevCycleConfig {
-            format: FormatConfig {
-                tool: "rustfmt".to_string(),
-                config_file: Some("rustfmt.toml".to_string()),
-                mandatory: true,
-            },
-            lint: LintConfig {
-                tool: "clippy".to_string(),
-                config_file: Some(".clippy.toml".to_string()),
-                severity_levels: vec!["warn".to_string(), "deny".to_string()],
-                mandatory: true,
-            },
-            test: TestConfig {
-                runner: "cargo test".to_string(),
-                min_coverage: Some(70.0),
-                test_types: vec!["unit".to_string(), "integration".to_string()],
-                mandatory: true,
-            },
-            git_hooks: GitHooksConfig {
-                pre_commit: vec!["format".to_string(), "lint".to_string()],
-                pre_push: vec!["test".to_string()],
-            },
-        }
+    // Ensure project path exists
+    if !dry_run {
+        fs::create_dir_all(&absolute_path)?;
     }
+
+    // Construct project path with project name
+    let project_path = absolute_path.join(&name);
+
+    // Construct Cargo command
+    let mut cargo_cmd = Command::new(cargo_bin);
+    cargo_cmd.arg("new").arg(&name).current_dir(&absolute_path);
+
+    // Add template if specified
+    if let Some(tmpl) = template {
+        cargo_cmd.arg("--template").arg(tmpl);
+    }
+
+    // Execute Cargo command
+    if !dry_run {
+        println!("Executing Cargo command: {:?}", cargo_cmd);
+        let status = cargo_cmd
+            .status()
+            .context("Failed to execute Cargo command")?;
+
+        if !status.success() {
+            return Err(anyhow::anyhow!("Cargo project initialization failed"));
+        }
+
+        println!(
+            "Project created successfully at: {}",
+            project_path.display()
+        );
+    } else {
+        println!("Dry run: Would execute command: {:?}", cargo_cmd);
+    }
+
+    // Create Fargin management structure if requested
+    if with_fargin && !dry_run {
+        println!(
+            "Creating Fargin management structure in: {}",
+            project_path.display()
+        );
+        create_fargin_structure(&project_path)?;
+    } else if dry_run && with_fargin {
+        println!(
+            "Dry run: Would create Fargin management structure in: {:?}",
+            project_path
+        );
+    }
+
+    Ok(())
 }
 
-/// Create initial project configuration
-pub fn init_project_config(project_path: &Path) -> Result<()> {
-    // Ensure .fargin directory exists
+/// Initialize a project from a template
+pub fn init_template_project(
+    template: String,
+    name: String,
+    path: PathBuf,
+    with_fargin: bool,
+    dry_run: bool,
+) -> Result<()> {
+    // Ensure path is relative to project root
+    let project_root = std::env::current_dir()?;
+    let absolute_path = project_root.join(path);
+
+    println!(
+        "Initializing Template project: {} from template {} in project path: {}",
+        name,
+        template,
+        absolute_path.display()
+    );
+
+    // Ensure project path exists
+    if !dry_run {
+        fs::create_dir_all(&absolute_path)?;
+    }
+
+    // Construct project path with project name
+    let project_path = absolute_path.join(&name);
+
+    // Example: Use cargo-generate for Rust templates
+    if !dry_run {
+        println!(
+            "Executing cargo generate command for template: {}",
+            template
+        );
+        let status = Command::new("cargo")
+            .args(["generate", "--name", &name, "--git", &template])
+            .current_dir(&absolute_path)
+            .status()
+            .context("Failed to generate project from template")?;
+
+        if !status.success() {
+            return Err(anyhow::anyhow!("Template project initialization failed"));
+        }
+
+        println!(
+            "Template project created successfully at: {}",
+            project_path.display()
+        );
+    } else {
+        println!(
+            "Dry run: Would generate project from template: {} with name: {}",
+            template, name
+        );
+    }
+
+    if with_fargin && !dry_run {
+        println!(
+            "Creating Fargin management structure in: {}",
+            project_path.display()
+        );
+        create_fargin_structure(&project_path)?;
+    } else if dry_run && with_fargin {
+        println!(
+            "Dry run: Would create Fargin management structure in: {:?}",
+            project_path
+        );
+    }
+
+    Ok(())
+}
+
+/// Create a minimal project structure
+pub fn init_minimal_project(
+    name: String,
+    path: PathBuf,
+    project_type: String,
+    with_fargin: bool,
+    dry_run: bool,
+) -> Result<()> {
+    // Ensure path is relative to project root
+    let project_root = std::env::current_dir()?;
+    let absolute_path = project_root.join(path);
+
+    println!(
+        "Initializing Minimal {} project: {} in project path: {}",
+        project_type,
+        name,
+        absolute_path.display()
+    );
+
+    // Construct project path with project name
+    let project_path = absolute_path.join(&name);
+
+    if !dry_run {
+        fs::create_dir_all(&project_path)?;
+    }
+
+    // Create basic project structure based on type
+    match project_type.as_str() {
+        "rust" => {
+            if !dry_run {
+                // Create minimal Rust project structure
+                println!("Creating minimal Rust project structure");
+                fs::write(
+                    project_path.join("Cargo.toml"),
+                    format!(
+                        r#"
+[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+                        name
+                    ),
+                )?;
+
+                fs::create_dir_all(project_path.join("src"))?;
+                fs::write(
+                    project_path.join("src/main.rs"),
+                    "fn main() {\n    println!(\"Hello, world!\");\n}\n",
+                )?;
+
+                println!(
+                    "Minimal Rust project created successfully at: {}",
+                    project_path.display()
+                );
+            } else {
+                println!("Dry run: Would create Rust project structure for: {}", name);
+            }
+        }
+        "python" => {
+            if !dry_run {
+                // Create minimal Python project structure
+                println!("Creating minimal Python project structure");
+                fs::write(
+                    project_path.join("pyproject.toml"),
+                    format!(
+                        r#"
+[tool.poetry]
+name = "{}"
+version = "0.1.0"
+description = ""
+authors = []
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+"#,
+                        name
+                    ),
+                )?;
+
+                fs::create_dir_all(project_path.join("src"))?;
+                fs::write(project_path.join("src/__init__.py"), "")?;
+                fs::write(project_path.join("src/main.py"), "def main():\n    print('Hello, world!')\n\nif __name__ == '__main__':\n    main()\n")?;
+
+                println!(
+                    "Minimal Python project created successfully at: {}",
+                    project_path.display()
+                );
+            } else {
+                println!(
+                    "Dry run: Would create Python project structure for: {}",
+                    name
+                );
+            }
+        }
+        _ => return Err(anyhow::anyhow!("Unsupported project type")),
+    }
+
+    // Create Fargin management structure
+    if with_fargin && !dry_run {
+        println!(
+            "Creating Fargin management structure in: {}",
+            project_path.display()
+        );
+        create_fargin_structure(&project_path)?;
+    } else if dry_run && with_fargin {
+        println!(
+            "Dry run: Would create Fargin management structure in: {:?}",
+            project_path
+        );
+    }
+
+    Ok(())
+}
+
+/// Create Fargin management structure
+fn create_fargin_structure(project_path: &Path) -> Result<()> {
+    // Create .fargin directory
     let fargin_dir = project_path.join(".fargin");
     fs::create_dir_all(&fargin_dir)?;
 
-    // Create default development cycle configuration
-    let dev_cycle_config = DevCycleConfig::default();
+    // Ensure project path is absolute
+    let absolute_project_path = fs::canonicalize(project_path)?;
 
-    // Serialize configuration to TOML
-    let toml_config = toml::to_string_pretty(&dev_cycle_config)
-        .context("Failed to serialize dev cycle configuration")?;
+    // Create subdirectories with more descriptive purposes
+    let subdirs = ["prompts", "templates", "history", "artifacts", "docs"];
 
-    // Write configuration to file
-    let config_path = fargin_dir.join("dev_cycle.toml");
-    let mut config_file =
-        fs::File::create(&config_path).context("Failed to create dev cycle configuration file")?;
+    for subdir in subdirs.iter() {
+        let subdir_path = fargin_dir.join(subdir);
+        fs::create_dir_all(&subdir_path)?;
 
-    config_file
-        .write_all(toml_config.as_bytes())
-        .context("Failed to write dev cycle configuration")?;
-
-    // Create initial git hooks
-    create_git_hooks(project_path, &dev_cycle_config.git_hooks)?;
-
-    // Create initial configuration files for format and lint tools
-    create_tool_config_files(project_path)?;
-
-    Ok(())
-}
-
-/// Create initial git hooks
-fn create_git_hooks(project_path: &Path, git_hooks: &GitHooksConfig) -> Result<()> {
-    let git_hooks_dir = project_path.join(".git/hooks");
-
-    // Ensure git hooks directory exists
-    fs::create_dir_all(&git_hooks_dir)?;
-
-    // Pre-commit hook
-    let pre_commit_path = git_hooks_dir.join("pre-commit");
-    let mut pre_commit_file = fs::File::create(&pre_commit_path)?;
-    pre_commit_file.write_all(b"#!/bin/sh\n\n# Pre-commit hooks\n")?;
-
-    for hook in &git_hooks.pre_commit {
-        let hook_content = match hook.as_str() {
-            "format" => "cargo fmt\n",
-            "lint" => "cargo clippy -- -D warnings\n",
-            _ => continue,
-        };
-        pre_commit_file.write_all(hook_content.as_bytes())?;
+        // Create a README for each subdirectory with descriptive content
+        fs::write(
+            subdir_path.join("README.md"),
+            format!(
+                "# {}\n\nThis directory is used for storing {} related to the project.",
+                subdir.to_uppercase(),
+                match *subdir {
+                    "prompts" => "AI and human prompts",
+                    "templates" => "project templates and boilerplate code",
+                    "history" => "project changes and evolution",
+                    "artifacts" => "generated files, logs, and build outputs",
+                    "docs" => "project documentation and design notes",
+                    _ => "project-related files",
+                }
+            ),
+        )?;
     }
 
-    // Make pre-commit hook executable
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&pre_commit_path)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&pre_commit_path, perms)?;
-    }
+    // Create initial config file
+    let project_name = absolute_project_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("Unnamed Project")
+        .to_string();
 
-    Ok(())
-}
-
-/// Create initial configuration files for formatting and linting
-fn create_tool_config_files(project_path: &Path) -> Result<()> {
-    // Rustfmt configuration
-    let rustfmt_path = project_path.join("rustfmt.toml");
-    let mut rustfmt_file = fs::File::create(&rustfmt_path)?;
-    rustfmt_file.write_all(b"max_width = 100\nindent_style = \"Block\"\n")?;
-
-    // Clippy configuration
-    let clippy_path = project_path.join(".clippy.toml");
-    let mut clippy_file = fs::File::create(&clippy_path)?;
-    clippy_file.write_all(b"cognitive-complexity-threshold = 30\n")?;
-
-    Ok(())
-}
-
-pub fn init_project(path: PathBuf) -> Result<()> {
     let config = ProjectConfig::new(
-        path.file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string(),
-        "A new LLM-driven project".to_string(),
+        project_name.clone(),
+        "A project managed with Fargin CLI".to_string(),
     );
-    config.save(&path)?;
+    config.save(&absolute_project_path)?;
 
-    // Create standard project structure
-    let dirs = [".fargin/prompts", ".fargin/history", ".fargin/templates"];
+    // Create a comprehensive README for the .fargin directory
+    fs::write(
+        fargin_dir.join("README.md"),
+        format!(
+            r#"# Fargin Project Management for {}
 
-    for dir in dirs.iter() {
-        fs::create_dir_all(path.join(dir))?;
+## Overview
+This directory contains Fargin-specific project management artifacts and tools.
+
+## Directory Structure
+- `prompts/`: Store project-specific AI and human prompts
+- `templates/`: Project templates and boilerplate code
+- `history/`: Track project evolution and changes
+- `artifacts/`: Store generated files, logs, and build outputs
+- `docs/`: Project documentation and design notes
+
+## Usage
+Fargin helps manage project complexity, track features, and streamline development workflows.
+
+### Recommended Practices
+1. Use prompts to capture project requirements
+2. Store reusable templates
+3. Document project changes in history
+4. Keep generated artifacts organized
+5. Maintain comprehensive documentation
+
+*Managed by Fargin CLI*
+"#,
+            project_name
+        ),
+    )?;
+
+    // Create a basic .gitignore for the .fargin directory
+    fs::write(
+        fargin_dir.join(".gitignore"),
+        r#"# Ignore sensitive or large artifacts
+artifacts/large_files/
+history/backups/
+*.log
+"#,
+    )?;
+
+    // Print debug information
+    println!(
+        "Fargin management structure created in: {}",
+        fargin_dir.display()
+    );
+    println!("Subdirectories:");
+    for subdir in subdirs.iter() {
+        println!("- {}", subdir);
     }
-
-    init_project_config(&path)?;
 
     Ok(())
 }

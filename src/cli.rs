@@ -1,256 +1,328 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use crate::features;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-/// LLM Sidekick - A project management tool for LLM-driven development
-///
-/// This tool helps manage and track the progress of projects that use Large Language Models (LLMs)
-/// for development. It provides project initialization, validation, progress tracking, and
-/// intelligent suggestions for next steps.
+/// Fargin - LLM-driven project development assistant
 #[derive(Parser)]
 #[command(
     author = "LLM Sidekick Contributors",
     version,
-    about,
-    long_about = "A comprehensive project management tool for LLM-driven development. \
-    It helps maintain project structure, track progress, and provide guidance \
-    throughout the development lifecycle."
+    about = "Streamline LLM-driven project development",
+    long_about = "A tool to help manage, develop, and optimize projects using large language models"
 )]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum FactTypeArg {
-    Prompt,
-    History,
-    Template,
-}
-
+/// Primary commands for project development workflow
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Initialize a new LLM-driven project
-    ///
-    /// Creates a new project structure with necessary configuration files and directories.
-    /// This includes setting up the .llm-sidekick directory with prompts, history, and templates.
+    /// Initialize a new project
     Init {
-        /// Path to the project directory
-        ///
-        /// If not specified, uses the current directory. The directory will be created
-        /// if it doesn't exist.
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
+        /// Subcommand for initialization operations
+        #[command(subcommand)]
+        operation: InitOperation,
     },
-    /// Validate project configuration and structure
-    ///
-    /// Checks that all required files and directories are present and properly configured.
-    /// Also validates the content of configuration files and project structure.
-    Validate {
-        /// Path to the project directory
-        ///
-        /// The directory to validate. Must contain a .llm-sidekick configuration.
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
-    },
-    /// Show project progress and status
-    ///
-    /// Displays detailed information about project progress, including completed
-    /// and pending tasks, milestones, and recent activity.
-    Progress {
-        /// Path to the project directory
-        ///
-        /// The directory containing the project to analyze. Must have a .llm-sidekick configuration.
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
-    },
-    /// Generate suggestions for next steps
-    ///
-    /// Analyzes the current project state and provides intelligent suggestions
-    /// for what to work on next, based on progress and project goals.
-    Suggest {
-        /// Path to the project directory
-        ///
-        /// The directory containing the project to analyze. Must have a .llm-sidekick configuration.
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
 
-        /// Type of suggestions to generate
-        ///
-        /// Allows filtering suggestions by type. Options include:
-        /// - 'all': Generate all types of suggestions (default)
-        /// - 'technical': Focus on technical implementation suggestions
-        /// - 'documentation': Prioritize documentation and knowledge capture
-        /// - 'refactoring': Suggest code improvements and optimizations
-        /// - 'testing': Recommend additional test coverage
-        #[arg(short, long, default_value = "all", value_name = "TYPE")]
-        suggestion_type: String,
+    /// Manage and develop project features
+    Feature {
+        /// Subcommand for feature operations
+        #[command(subcommand)]
+        operation: FeatureOperation,
 
-        /// Verbosity level for suggestions
-        ///
-        /// Controls the level of detail in generated suggestions.
-        /// - 'brief': Concise, high-level suggestions
-        /// - 'detailed': In-depth analysis and recommendations
-        #[arg(short, long, default_value = "brief", value_name = "VERBOSITY")]
-        verbosity: String,
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
     },
-    /// Reset project by removing all LLM-sidekick related files
-    ///
-    /// Removes all LLM-sidekick configuration, history, and generated files from the project.
-    /// This action cannot be undone. Use with caution.
+
+    /// Design and architect project components
+    Design {
+        /// Subcommand for design operations
+        #[command(subcommand)]
+        operation: DesignOperation,
+
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+    },
+
+    /// Check project health, validate configurations
+    Check {
+        /// Subcommand for various checks
+        #[command(subcommand)]
+        operation: CheckOperation,
+
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+    },
+
+    /// Reset project state or configurations
     Reset {
-        /// Path to the project directory
-        ///
-        /// The directory containing the LLM-sidekick configuration to remove.
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
+        /// Reset scope
+        #[arg(default_value = "soft")]
+        scope: String,
+
         /// Force reset without confirmation
-        ///
-        /// Skip the confirmation prompt and immediately remove all LLM-sidekick files.
-        /// Use with caution as this operation cannot be undone.
-        #[arg(short, long, help = "Skip confirmation prompt")]
+        #[arg(short, long)]
         force: bool,
     },
-    /// Add a new fact (prompt, history, or template)
+
+    /// Provide guidance and best practices
+    Howto {
+        /// Topic or area to get guidance on
+        topic: Option<String>,
+
+        /// Verbosity of guidance
+        #[arg(short, long, default_value = "normal")]
+        verbosity: String,
+
+        /// Output format for the howto guide
+        #[arg(long, value_enum, default_value_t = HowtoOutputFormat::Terminal)]
+        output: HowtoOutputFormat,
+
+        /// Path to save the howto documentation
+        #[arg(long)]
+        save_path: Option<PathBuf>,
+
+        /// List all available howto topics
+        #[arg(long, short)]
+        list_topics: bool,
+    },
+}
+
+/// Project initialization options
+#[derive(Subcommand)]
+pub enum InitOperation {
+    /// Create a new Rust project using Cargo
+    Rust {
+        /// Project name
+        name: String,
+
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+
+        /// Cargo binary to use (default: cargo)
+        #[arg(long, default_value = "cargo")]
+        cargo_bin: String,
+
+        /// Cargo template or preset
+        #[arg(short, long)]
+        template: Option<String>,
+
+        /// Initialize with Fargin management structure
+        #[arg(short, long, default_value = "true")]
+        with_fargin: bool,
+
+        /// Perform a dry run without creating actual files
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Create a new project from a template
+    Template {
+        /// Template name or source
+        template: String,
+
+        /// Project name
+        name: String,
+
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+
+        /// Initialize with Fargin management structure
+        #[arg(short, long, default_value = "true")]
+        with_fargin: bool,
+
+        /// Perform a dry run without creating actual files
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Create a minimal Fargin project structure
+    Minimal {
+        /// Project name
+        name: String,
+
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+
+        /// Project type (rust, python, js, etc.)
+        #[arg(short = 't', long, default_value = "rust")]
+        project_type: String,
+
+        /// Include Fargin management structure
+        #[arg(short, long)]
+        with_fargin: bool,
+
+        /// Perform a dry run without creating actual files
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+/// Feature management operations
+#[derive(Subcommand)]
+pub enum FeatureOperation {
+    /// Add a new feature to the project
     Add {
-        /// Type of fact to add
-        #[arg(value_enum)]
-        fact_type: FactTypeArg,
+        /// Feature name
+        name: String,
 
-        /// Content of the fact
-        #[arg(value_name = "CONTENT")]
-        content: String,
-
-        /// Description of the fact
-        #[arg(short, long, value_name = "DESC")]
+        /// Optional detailed description
+        #[arg(short, long)]
         description: Option<String>,
 
-        /// Tags to associate with the fact
-        #[arg(short, long, value_name = "TAGS", value_delimiter = ',')]
+        /// Tags or categories for the feature
+        #[arg(short, long, value_delimiter = ',')]
         tags: Option<Vec<String>>,
 
-        /// Version of the fact
-        #[arg(short, long, value_name = "VER")]
-        version: Option<String>,
+        /// Priority of the feature
+        #[arg(short, long, value_enum)]
+        priority: Option<features::Priority>,
 
-        /// References to other facts or external resources
-        #[arg(short, long, value_name = "REFS", value_delimiter = ',')]
-        references: Option<Vec<String>>,
-
-        /// Path to the project directory
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
+        /// Assign feature to a specific person/team
+        #[arg(short, long)]
+        assigned_to: Option<String>,
     },
 
-    /// List facts of a specific type
+    /// List existing features
     List {
-        /// Type of facts to list
-        #[arg(value_enum)]
-        fact_type: FactTypeArg,
+        /// Filter features by tag
+        #[arg(short, long)]
+        tag: Option<String>,
 
-        /// Path to the project directory
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
+        /// Filter features by status
+        #[arg(short, long, value_enum)]
+        status: Option<features::FeatureStatus>,
+
+        /// Filter features by priority
+        #[arg(short, long, value_enum)]
+        priority: Option<features::Priority>,
     },
 
-    /// Show details of a specific fact
+    /// Show details of a specific feature
     Show {
-        /// ID of the fact to show
-        #[arg(value_name = "ID")]
-        fact_id: String,
-
-        /// Type of the fact
-        #[arg(value_enum)]
-        fact_type: FactTypeArg,
-
-        /// Path to the project directory
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
+        /// Feature ID
+        id: String,
     },
 
-    /// Update an existing fact
+    /// Update an existing feature
     Update {
-        /// ID of the fact to update
-        #[arg(value_name = "ID")]
-        fact_id: String,
+        /// Feature ID
+        id: String,
 
-        /// Type of the fact
-        #[arg(value_enum)]
-        fact_type: FactTypeArg,
-
-        /// Optional new content for the fact
-        #[arg(short, long, value_name = "CONTENT")]
-        content: Option<String>,
-
-        /// New description for the fact
-        #[arg(short, long, value_name = "DESC")]
+        /// New description
+        #[arg(short, long)]
         description: Option<String>,
 
-        /// New tags for the fact
-        #[arg(short, long, value_name = "TAGS", value_delimiter = ',')]
+        /// Update feature status
+        #[arg(short, long, value_enum)]
+        status: Option<features::FeatureStatus>,
+
+        /// Update feature priority
+        #[arg(short, long, value_enum)]
+        priority: Option<features::Priority>,
+
+        /// Update feature tags
+        #[arg(short, long, value_delimiter = ',')]
         tags: Option<Vec<String>>,
 
-        /// New version for the fact
-        #[arg(short, long, value_name = "VER")]
-        version: Option<String>,
-
-        /// New references for the fact
-        #[arg(short, long, value_name = "REFS", value_delimiter = ',')]
-        references: Option<Vec<String>>,
-
-        /// Path to the project directory
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
+        /// Reassign feature
+        #[arg(short, long)]
+        assigned_to: Option<String>,
     },
 
-    /// Search facts
-    Search {
-        /// Search query
-        #[arg(value_name = "QUERY")]
-        query: String,
+    /// Remove a feature from the project
+    Remove {
+        /// Feature ID
+        id: String,
+    },
+}
 
-        /// Type of facts to search (optional)
-        #[arg(value_enum)]
-        fact_type: Option<FactTypeArg>,
+/// Design operations for project architecture
+#[derive(Subcommand)]
+pub enum DesignOperation {
+    /// Create a new architectural design
+    Create {
+        /// Design name
+        name: String,
 
-        /// Path to the project directory
-        #[arg(default_value = ".", value_name = "DIR")]
-        path: PathBuf,
+        /// Optional design description
+        #[arg(short, long)]
+        description: Option<String>,
     },
 
-    /// Generate LLM-friendly documentation
+    /// List existing architectural designs
+    List,
+
+    /// Show details of a specific design
+    Show {
+        /// Design identifier
+        id: String,
+    },
+}
+
+/// Check operations for project health and consistency
+#[derive(Debug, Subcommand)]
+pub enum CheckOperation {
+    /// Run comprehensive project health checks
     ///
-    /// Creates comprehensive documentation about the project, including project details,
-    /// prompts, templates, interaction history, and best practices.
-    Docs {
-        /// Path to the project directory
-        ///
-        /// The directory containing the project to generate documentation for.
-        /// Must have a .llm-sidekick configuration.
-        #[arg(default_value = ".", value_name = "DIR")]
+    /// Preferred option when inside the LLM agent chat for quick,
+    /// non-blocking project validation and health assessment.
+    Run {
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+    },
+
+    /// Continuously run project checks in a loop
+    Loop {
+        /// Project path (default: current directory)
+        #[arg(long, default_value = ".", value_name = "PROJECT_PATH")]
         path: PathBuf,
 
-        /// Output format for documentation
-        ///
-        /// Specifies the output format for the generated documentation.
-        /// Supports 'markdown' (default) and 'json' formats.
-        #[arg(
-            long = "format",
-            short = 'o',
-            default_value = "markdown",
-            value_name = "FORMAT"
-        )]
-        format: String,
+        /// Interval between checks (in seconds)
+        #[arg(short = 'i', long, default_value = "60")]
+        interval: u64,
 
-        /// Focus area for documentation
-        ///
-        /// Allows generating documentation for a specific section or the entire project.
-        /// Options include: 'all' (default), 'project', 'prompts', 'templates', 'history'.
-        #[arg(
-            long = "focus",
-            short = 'a',
-            default_value = "all",
-            value_name = "FOCUS"
-        )]
-        focus: String,
+        /// Stop after a specific number of iterations (0 = infinite)
+        #[arg(short = 'n', long, default_value = "0")]
+        iterations: u64,
     },
+
+    /// Verify code formatting
+    Fmt {
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+    },
+
+    /// Run linting checks
+    Lint {
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+    },
+
+    /// Run unit tests
+    Test {
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+    },
+
+    /// Check Git repository status
+    Git,
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum HowtoOutputFormat {
+    Terminal,
+    Markdown,
+    Html,
 }

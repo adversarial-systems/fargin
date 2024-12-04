@@ -1,6 +1,6 @@
 [package]
 name = "fargin"
-version = "0.1.58"
+version = "0.1.60"
 edition = "2021"
 authors = ["LLM Sidekick Contributors"]
 description = "A flexible Rust library for managing project development with integrated configuration and AI-assisted guidance"
@@ -12,11 +12,12 @@ homepage = "https://github.com/adversarial-systems/fargin.git"
 keywords = ["llm", "ai", "project-management", "development-tools", "configuration"]
 categories = ["development-tools", "command-line-utilities", "config"]
 exclude = [
-    ".llm-sidekick/*",
+    ".fargin/*",
     "tests/*",
     "examples/*",
     "docs/*",
     ".github/*",
+    "target/*",
 ]
 
 [package.metadata.docs.rs]
@@ -32,7 +33,7 @@ minimal = []
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.8"
+toml = "0.7"
 
 # Error handling
 anyhow = "1.0"
@@ -40,18 +41,19 @@ thiserror = "1.0"
 
 # Logging
 log = "0.4"
+env_logger = "0.10"
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
 
 # Optional CLI dependencies
-clap = { version = "4.5", features = ["derive"] }
-env_logger = "0.10"
+clap = { version = "4.3", features = ["derive"] }
 
 # File system and time
 directories = "5.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.7", features = ["v4"] }
+colored = "2.0"
 
 [dev-dependencies]
 tokio-test = "0.4"
