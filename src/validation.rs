@@ -1,19 +1,18 @@
+use crate::config::ProjectConfig;
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
-use crate::config::ProjectConfig;
 
 pub fn validate_project(path: PathBuf) -> Result<ValidationReport> {
-    let config = ProjectConfig::load(&path)
-        .context("Failed to load project configuration")?;
-    
+    let config = ProjectConfig::load(&path).context("Failed to load project configuration")?;
+
     let mut report = ValidationReport::new();
-    
+
     // Validate project structure
     report.add_check(validate_directory_structure(&path)?);
-    
+
     // Validate configuration
     report.add_check(validate_configuration(&config)?);
-    
+
     Ok(report)
 }
 
@@ -36,11 +35,15 @@ pub enum ValidationStatus {
     Error,
 }
 
+impl Default for ValidationReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ValidationReport {
     pub fn new() -> Self {
-        Self {
-            checks: Vec::new(),
-        }
+        Self { checks: Vec::new() }
     }
 
     pub fn add_check(&mut self, check: ValidationCheck) {
@@ -48,7 +51,9 @@ impl ValidationReport {
     }
 
     pub fn has_errors(&self) -> bool {
-        self.checks.iter().any(|check| matches!(check.status, ValidationStatus::Error))
+        self.checks
+            .iter()
+            .any(|check| matches!(check.status, ValidationStatus::Error))
     }
 }
 
@@ -59,7 +64,7 @@ fn validate_directory_structure(path: &Path) -> Result<ValidationCheck> {
         ".fargin/history",
         ".fargin/templates",
     ];
-    
+
     for dir in required_dirs.iter() {
         if !path.join(dir).exists() {
             return Ok(ValidationCheck {
@@ -69,7 +74,7 @@ fn validate_directory_structure(path: &Path) -> Result<ValidationCheck> {
             });
         }
     }
-    
+
     Ok(ValidationCheck {
         name: "Directory Structure".to_string(),
         status: ValidationStatus::Pass,
@@ -85,7 +90,7 @@ fn validate_configuration(config: &ProjectConfig) -> Result<ValidationCheck> {
             message: Some("Project name cannot be empty".to_string()),
         });
     }
-    
+
     if config.description.is_empty() {
         return Ok(ValidationCheck {
             name: "Configuration".to_string(),
@@ -93,7 +98,7 @@ fn validate_configuration(config: &ProjectConfig) -> Result<ValidationCheck> {
             message: Some("Project description is empty".to_string()),
         });
     }
-    
+
     Ok(ValidationCheck {
         name: "Configuration".to_string(),
         status: ValidationStatus::Pass,

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use std::fs;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectConfig {
@@ -61,17 +61,13 @@ pub fn init_project(path: PathBuf) -> Result<()> {
         "A new LLM-driven project".to_string(),
     );
     config.save(&path)?;
-    
+
     // Create standard project structure
-    let dirs = [
-        ".fargin/prompts",
-        ".fargin/history",
-        ".fargin/templates",
-    ];
-    
+    let dirs = [".fargin/prompts", ".fargin/history", ".fargin/templates"];
+
     for dir in dirs.iter() {
         fs::create_dir_all(path.join(dir))?;
     }
-    
+
     Ok(())
 }

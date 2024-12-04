@@ -1,9 +1,9 @@
 pub mod cli;
 pub mod config;
 pub mod progress;
-pub mod validation;
-pub mod suggestions;
 pub mod reset;
+pub mod suggestions;
+pub mod validation;
 
 use anyhow::Result;
 use cli::Cli;
@@ -35,7 +35,7 @@ pub async fn run(cli: Cli) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::*;
 
     #[test]
     fn it_works() {
