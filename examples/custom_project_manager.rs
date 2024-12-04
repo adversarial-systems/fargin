@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
 
     // Validate the project
     println!("Validating project...");
-    let validation_result = validate_project(project_dir.clone())?;
+    let _validation_result = validate_project(project_dir.clone())?;
     println!("Validation complete!");
 
     // Show progress
