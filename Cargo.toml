@@ -32,7 +32,7 @@ minimal = []
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.7"
+toml = "0.8"
 
 # Error handling
 anyhow = "1.0"
@@ -45,16 +45,17 @@ log = "0.4"
 tokio = { version = "1.0", features = ["full"] }
 
 # Optional CLI dependencies
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.10"
 
 # File system and time
 directories = "5.0"
 chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.7", features = ["v4"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3.8"
+tempfile = "3.10"
 assert_fs = "1.0"
 predicates = "3.0"
 

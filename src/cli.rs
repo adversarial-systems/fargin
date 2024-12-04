@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 /// LLM Sidekick - A project management tool for LLM-driven development
@@ -18,6 +18,13 @@ use std::path::PathBuf;
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum FactTypeArg {
+    Prompt,
+    History,
+    Template,
 }
 
 #[derive(Subcommand)]
@@ -66,6 +73,25 @@ pub enum Commands {
         /// The directory containing the project to analyze. Must have a .llm-sidekick configuration.
         #[arg(default_value = ".", value_name = "DIR")]
         path: PathBuf,
+
+        /// Type of suggestions to generate
+        ///
+        /// Allows filtering suggestions by type. Options include:
+        /// - 'all': Generate all types of suggestions (default)
+        /// - 'technical': Focus on technical implementation suggestions
+        /// - 'documentation': Prioritize documentation and knowledge capture
+        /// - 'refactoring': Suggest code improvements and optimizations
+        /// - 'testing': Recommend additional test coverage
+        #[arg(short, long, default_value = "all", value_name = "TYPE")]
+        suggestion_type: String,
+
+        /// Verbosity level for suggestions
+        ///
+        /// Controls the level of detail in generated suggestions.
+        /// - 'brief': Concise, high-level suggestions
+        /// - 'detailed': In-depth analysis and recommendations
+        #[arg(short, long, default_value = "brief", value_name = "VERBOSITY")]
+        verbosity: String,
     },
     /// Reset project by removing all LLM-sidekick related files
     ///
@@ -83,5 +109,148 @@ pub enum Commands {
         /// Use with caution as this operation cannot be undone.
         #[arg(short, long, help = "Skip confirmation prompt")]
         force: bool,
+    },
+    /// Add a new fact (prompt, history, or template)
+    Add {
+        /// Type of fact to add
+        #[arg(value_enum)]
+        fact_type: FactTypeArg,
+
+        /// Content of the fact
+        #[arg(value_name = "CONTENT")]
+        content: String,
+
+        /// Description of the fact
+        #[arg(short, long, value_name = "DESC")]
+        description: Option<String>,
+
+        /// Tags to associate with the fact
+        #[arg(short, long, value_name = "TAGS", value_delimiter = ',')]
+        tags: Option<Vec<String>>,
+
+        /// Version of the fact
+        #[arg(short, long, value_name = "VER")]
+        version: Option<String>,
+
+        /// References to other facts or external resources
+        #[arg(short, long, value_name = "REFS", value_delimiter = ',')]
+        references: Option<Vec<String>>,
+
+        /// Path to the project directory
+        #[arg(default_value = ".", value_name = "DIR")]
+        path: PathBuf,
+    },
+
+    /// List facts of a specific type
+    List {
+        /// Type of facts to list
+        #[arg(value_enum)]
+        fact_type: FactTypeArg,
+
+        /// Path to the project directory
+        #[arg(default_value = ".", value_name = "DIR")]
+        path: PathBuf,
+    },
+
+    /// Show details of a specific fact
+    Show {
+        /// ID of the fact to show
+        #[arg(value_name = "ID")]
+        fact_id: String,
+
+        /// Type of the fact
+        #[arg(value_enum)]
+        fact_type: FactTypeArg,
+
+        /// Path to the project directory
+        #[arg(default_value = ".", value_name = "DIR")]
+        path: PathBuf,
+    },
+
+    /// Update an existing fact
+    Update {
+        /// ID of the fact to update
+        #[arg(value_name = "ID")]
+        fact_id: String,
+
+        /// Type of the fact
+        #[arg(value_enum)]
+        fact_type: FactTypeArg,
+
+        /// Optional new content for the fact
+        #[arg(short, long, value_name = "CONTENT")]
+        content: Option<String>,
+
+        /// New description for the fact
+        #[arg(short, long, value_name = "DESC")]
+        description: Option<String>,
+
+        /// New tags for the fact
+        #[arg(short, long, value_name = "TAGS", value_delimiter = ',')]
+        tags: Option<Vec<String>>,
+
+        /// New version for the fact
+        #[arg(short, long, value_name = "VER")]
+        version: Option<String>,
+
+        /// New references for the fact
+        #[arg(short, long, value_name = "REFS", value_delimiter = ',')]
+        references: Option<Vec<String>>,
+
+        /// Path to the project directory
+        #[arg(default_value = ".", value_name = "DIR")]
+        path: PathBuf,
+    },
+
+    /// Search facts
+    Search {
+        /// Search query
+        #[arg(value_name = "QUERY")]
+        query: String,
+
+        /// Type of facts to search (optional)
+        #[arg(value_enum)]
+        fact_type: Option<FactTypeArg>,
+
+        /// Path to the project directory
+        #[arg(default_value = ".", value_name = "DIR")]
+        path: PathBuf,
+    },
+
+    /// Generate LLM-friendly documentation
+    ///
+    /// Creates comprehensive documentation about the project, including project details,
+    /// prompts, templates, interaction history, and best practices.
+    Docs {
+        /// Path to the project directory
+        ///
+        /// The directory containing the project to generate documentation for.
+        /// Must have a .llm-sidekick configuration.
+        #[arg(default_value = ".", value_name = "DIR")]
+        path: PathBuf,
+
+        /// Output format for documentation
+        ///
+        /// Specifies the output format for the generated documentation.
+        /// Supports 'markdown' (default) and 'json' formats.
+        #[arg(
+            long = "format",
+            short = 'o',
+            default_value = "markdown",
+            value_name = "FORMAT"
+        )]
+        format: String,
+
+        /// Focus area for documentation
+        ///
+        /// Allows generating documentation for a specific section or the entire project.
+        /// Options include: 'all' (default), 'project', 'prompts', 'templates', 'history'.
+        #[arg(
+            long = "focus",
+            short = 'a',
+            default_value = "all",
+            value_name = "FOCUS"
+        )]
+        focus: String,
     },
 }
