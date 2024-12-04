@@ -1,6 +1,6 @@
 [package]
 name = "fargin"
-version = "0.1.61"
+version = "0.1.60"
 edition = "2021"
 authors = ["LLM Sidekick Contributors"]
 description = "A flexible Rust library for managing project development with integrated configuration and AI-assisted guidance"
