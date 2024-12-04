@@ -1,0 +1,68 @@
+[package]
+name = "fargin"
+version = "0.1.57"
+edition = "2021"
+authors = ["LLM Sidekick Contributors"]
+description = "A flexible Rust library for managing project development with integrated configuration and AI-assisted guidance"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/adversarial-systems/fargin.git"
+documentation = "https://docs.rs/fargin"
+homepage = "https://github.com/adversarial-systems/fargin.git"
+keywords = ["llm", "ai", "project-management", "development-tools", "configuration"]
+categories = ["development-tools", "command-line-utilities", "config"]
+exclude = [
+    ".llm-sidekick/*",
+    "tests/*",
+    "examples/*",
+    "docs/*",
+    ".github/*",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = ["cli"]
+cli = []
+minimal = []
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.7"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Optional CLI dependencies
+clap = { version = "4.0", features = ["derive"] }
+env_logger = "0.10"
+
+# File system and time
+directories = "5.0"
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
+assert_fs = "1.0"
+predicates = "3.0"
+
+[lib]
+name = "fargin"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fargin"
+path = "src/main.rs"
+required-features = ["cli"]
