@@ -35,10 +35,10 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-fargin = "0.1.57alpha"
+fargin = "0.1.58"
 
 # Or for minimal installation without CLI features:
-fargin = { version = "0.1.57alpha", default-features = false, features = ["minimal"] }
+fargin = { version = "0.1.58", default-features = false, features = ["minimal"] }
 ```
 
 ## Usage
