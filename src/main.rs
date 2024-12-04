@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 use fargin::cli::{
-    CheckOperation, Cli, Commands, DesignOperation, FeatureOperation, InitOperation,
+    CheckOperation, Cli, Commands, DesignOperation, FeatureOperation, HowtoOutputFormat,
+    InitOperation,
 };
 use fargin::config::ProjectConfig;
 use fargin::features::FeatureManager;
@@ -234,6 +235,175 @@ fn main() -> Result<()> {
                 FeatureOperation::Remove { id } => {
                     feature_manager.delete_feature(&id)?;
                     println!("Feature {} deleted successfully", id);
+                    Ok(())
+                }
+                FeatureOperation::Suggest {
+                    id,
+                    suggestion_type,
+                    verbosity,
+                    output,
+                    save_path,
+                } => {
+                    // Retrieve the feature
+                    let feature = match feature_manager.get_feature(&id) {
+                        Some(f) => f,
+                        None => return Err(anyhow::anyhow!("Feature not found")),
+                    };
+
+                    // Generate suggestions
+                    let suggestions = feature_manager.generate_feature_suggestions(
+                        feature,
+                        suggestion_type,
+                        &verbosity,
+                    );
+
+                    // Format and display suggestions
+                    if suggestions.is_empty() {
+                        println!("No suggestions found for feature: {}", id);
+                        return Ok(());
+                    }
+
+                    // Output formatting based on selected format
+                    match output {
+                        HowtoOutputFormat::Terminal => {
+                            println!("Suggestions for Feature: {}", feature.name);
+                            for suggestion in suggestions {
+                                println!("\n🔹 Suggestion ID: {}", suggestion.id);
+                                println!("   Type: {:?}", suggestion.suggestion_type);
+                                println!("   Content: {}", suggestion.content);
+                                println!("   Confidence: {:.2}%", suggestion.confidence * 100.0);
+                                println!("   Complexity: {}/10", suggestion.complexity);
+                                println!("   Impact: {:?}", suggestion.impact);
+
+                                if !suggestion.tags.is_empty() {
+                                    println!("   Tags: {}", suggestion.tags.join(", "));
+                                }
+
+                                if !suggestion.next_steps.is_empty() {
+                                    println!("   Next Steps:");
+                                    for (i, step) in suggestion.next_steps.iter().enumerate() {
+                                        println!("   {}. {}", i + 1, step);
+                                    }
+                                }
+                            }
+                        }
+                        HowtoOutputFormat::Markdown => {
+                            let mut markdown =
+                                format!("# Suggestions for Feature: {}\n\n", feature.name);
+                            for suggestion in suggestions {
+                                markdown.push_str(&format!("## Suggestion: {}\n\n", suggestion.id));
+                                markdown.push_str(&format!(
+                                    "- **Type**: {:#?}\n",
+                                    suggestion.suggestion_type
+                                ));
+                                markdown
+                                    .push_str(&format!("- **Content**: {}\n", suggestion.content));
+                                markdown.push_str(&format!(
+                                    "- **Confidence**: {:.2}%\n",
+                                    suggestion.confidence * 100.0
+                                ));
+                                markdown.push_str(&format!(
+                                    "- **Complexity**: {}/10\n",
+                                    suggestion.complexity
+                                ));
+                                markdown
+                                    .push_str(&format!("- **Impact**: {:#?}\n", suggestion.impact));
+
+                                if !suggestion.tags.is_empty() {
+                                    markdown.push_str(&format!(
+                                        "- **Tags**: {}\n",
+                                        suggestion.tags.join(", ")
+                                    ));
+                                }
+
+                                if !suggestion.next_steps.is_empty() {
+                                    markdown.push_str("### Next Steps:\n\n");
+                                    for (i, step) in suggestion.next_steps.iter().enumerate() {
+                                        markdown.push_str(&format!("{}. {}\n", i + 1, step));
+                                    }
+                                }
+                                markdown.push_str("\n---\n\n");
+                            }
+
+                            // If save_path is provided, save the markdown
+                            if let Some(path) = save_path {
+                                fs::write(&path, &markdown)?;
+                                println!("Suggestions saved to: {}", path.display());
+                            } else {
+                                println!("{}", markdown);
+                            }
+                        }
+                        HowtoOutputFormat::Html => {
+                            let mut html = format!(
+                                "<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <title>Suggestions for Feature: {}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; line-height: 1.6; }}
+        h1 {{ color: #333; }}
+        h2 {{ color: #666; }}
+        .suggestion {{ border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; }}
+        .tag {{ background-color: #f0f0f0; padding: 3px 6px; margin-right: 5px; border-radius: 3px; }}
+    </style>
+</head>
+<body>
+    <h1>Suggestions for Feature: {}</h1>
+",
+                                feature.name, feature.name
+                            );
+
+                            for suggestion in suggestions {
+                                html.push_str(&format!(
+                                    "
+    <div class='suggestion'>
+        <h2>Suggestion: {}</h2>
+        <p><strong>Type</strong>: {:#?}</p>
+        <p><strong>Content</strong>: {}</p>
+        <p><strong>Confidence</strong>: {:.2}%</p>
+        <p><strong>Complexity</strong>: {}/10</p>
+        <p><strong>Impact</strong>: {:#?}</p>
+",
+                                    suggestion.id,
+                                    suggestion.suggestion_type,
+                                    suggestion.content,
+                                    suggestion.confidence * 100.0,
+                                    suggestion.complexity,
+                                    suggestion.impact
+                                ));
+
+                                if !suggestion.tags.is_empty() {
+                                    html.push_str("<p><strong>Tags</strong>: ");
+                                    for tag in &suggestion.tags {
+                                        html.push_str(&format!("<span class='tag'>{}</span>", tag));
+                                    }
+                                    html.push_str("</p>");
+                                }
+
+                                if !suggestion.next_steps.is_empty() {
+                                    html.push_str("<h3>Next Steps:</h3><ol>");
+                                    for step in &suggestion.next_steps {
+                                        html.push_str(&format!("<li>{}</li>", step));
+                                    }
+                                    html.push_str("</ol>");
+                                }
+
+                                html.push_str("</div>");
+                            }
+
+                            html.push_str("</body></html>");
+
+                            // If save_path is provided, save the HTML
+                            if let Some(path) = save_path {
+                                fs::write(&path, &html)?;
+                                println!("Suggestions saved to: {}", path.display());
+                            } else {
+                                println!("{}", html);
+                            }
+                        }
+                    }
+
                     Ok(())
                 }
             }

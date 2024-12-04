@@ -409,6 +409,116 @@ impl ProjectChecker {
             report.git_health.unpushed_commits
         )
     }
+
+    /// Generate AI-powered recommendations for project improvement
+    pub fn generate_next_steps(&self, report: &ProjectHealthReport) -> Vec<String> {
+        let mut recommendations = Vec::new();
+
+        // Feature Health Recommendations
+        let implemented_features = report
+            .feature_health
+            .status_distribution
+            .get(&FeatureStatus::Implemented)
+            .cloned()
+            .unwrap_or(0);
+        let in_progress_features = report
+            .feature_health
+            .status_distribution
+            .get(&FeatureStatus::InProgress)
+            .cloned()
+            .unwrap_or(0);
+        let blocked_features = report
+            .feature_health
+            .status_distribution
+            .get(&FeatureStatus::Blocked)
+            .cloned()
+            .unwrap_or(0);
+
+        // Feature Progress Recommendations
+        if blocked_features > 0 {
+            recommendations.push(format!(
+                "🚧 Unblock {} stalled features to improve project momentum",
+                blocked_features
+            ));
+        }
+
+        if in_progress_features > 0 {
+            recommendations.push(format!(
+                "🏃 Complete {} in-progress features to increase project velocity",
+                in_progress_features
+            ));
+        }
+
+        if !report.feature_health.stale_features.is_empty() {
+            recommendations.push(format!(
+                "🧹 Review and update {} stale features that haven't been touched recently",
+                report.feature_health.stale_features.len()
+            ));
+        }
+
+        // Dependency Recommendations
+        if !report.dependency_health.outdated_dependencies.is_empty() {
+            recommendations.push(format!(
+                "🔄 Update {} outdated dependencies to improve security and compatibility",
+                report.dependency_health.outdated_dependencies.len()
+            ));
+        }
+
+        // Git Health Recommendations
+        if report.git_health.uncommitted_changes {
+            recommendations.push(
+                "💾 Commit your current changes to maintain a clean working state".to_string(),
+            );
+        }
+
+        if report.git_health.unpushed_commits {
+            recommendations.push(
+                "🌐 Push your local commits to keep the remote repository up to date".to_string(),
+            );
+        }
+
+        // Project Structure Recommendations
+        if !report.file_structure.missing_dirs.is_empty() {
+            recommendations.push(format!(
+                "📂 Create {} missing recommended project directories to improve organization",
+                report.file_structure.missing_dirs.len()
+            ));
+        }
+
+        // Overall Progress Recommendations
+        let total_features = report.feature_health.total_features;
+        let implemented_percentage = if total_features > 0 {
+            (implemented_features as f64 / total_features as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        match implemented_percentage {
+            p if (0.0..25.0).contains(&p) => recommendations.push("🚀 Your project is in early stages. Focus on defining core features and establishing project foundations".to_string()),
+            p if (25.0..50.0).contains(&p) => recommendations.push("🌱 Project is growing. Start consolidating features and improving code quality".to_string()),
+            p if (50.0..75.0).contains(&p) => recommendations.push("🌿 Project is maturing. Begin optimizing workflows and preparing for beta/release".to_string()),
+            p if p >= 75.0 => recommendations.push("🌳 Project is near completion. Focus on polishing, documentation, and final testing".to_string()),
+            _ => {}
+        }
+
+        // Priority Sorting
+        recommendations.sort_by_key(|rec| match rec {
+            r if r.contains("🚧") => 1,  // Unblock features
+            r if r.contains("🏃") => 2,  // Complete in-progress features
+            r if r.contains("🔄") => 3,  // Update dependencies
+            r if r.contains("🧹") => 4,  // Clean up stale features
+            r if r.contains("💾") => 5,  // Commit changes
+            r if r.contains("🌐") => 6,  // Push commits
+            r if r.contains("📂") => 7,  // Improve project structure
+            r if r.contains("🚀") => 8,  // Early stage recommendations
+            r if r.contains("🌱") => 9,  // Growing stage recommendations
+            r if r.contains("🌿") => 10, // Maturing stage recommendations
+            r if r.contains("🌳") => 11, // Near completion recommendations
+            _ => 12,
+        });
+
+        recommendations
+    }
 }
 
 /// Comprehensive project health report

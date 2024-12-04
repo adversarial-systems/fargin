@@ -346,15 +346,145 @@ impl FeatureManager {
     pub fn generate_feature_suggestions(
         &self,
         feature: &Feature,
-        _suggestion_type: Option<SuggestionType>,
-        _verbosity: &str,
+        suggestion_type: Option<SuggestionType>,
+        verbosity: &str,
     ) -> Vec<FeatureSuggestion> {
-        // Placeholder implementation
+        // More intelligent suggestion generation
+        let base_suggestions = match suggestion_type {
+            Some(st) => self.generate_specific_suggestions(feature, st),
+            None => self.generate_comprehensive_suggestions(feature),
+        };
+
+        // Apply verbosity filtering
+        self.filter_suggestions_by_verbosity(base_suggestions, verbosity)
+    }
+
+    fn generate_specific_suggestions(
+        &self,
+        feature: &Feature,
+        suggestion_type: SuggestionType,
+    ) -> Vec<FeatureSuggestion> {
+        match suggestion_type {
+            SuggestionType::Implementation => self.generate_implementation_suggestions(feature),
+            SuggestionType::Testing => self.generate_testing_suggestions(feature),
+            SuggestionType::Optimization => self.generate_optimization_suggestions(feature),
+            SuggestionType::Documentation => self.generate_documentation_suggestions(feature),
+            SuggestionType::Architecture => self.generate_architecture_suggestions(feature),
+            SuggestionType::Performance => self.generate_performance_suggestions(feature),
+            SuggestionType::Security => self.generate_security_suggestions(feature),
+            SuggestionType::Refactoring => self.generate_refactoring_suggestions(feature),
+            SuggestionType::UserExperience => self.generate_ux_suggestions(feature),
+        }
+    }
+
+    fn generate_comprehensive_suggestions(&self, feature: &Feature) -> Vec<FeatureSuggestion> {
+        let mut suggestions = Vec::new();
+
+        // Generate suggestions across different types
+        suggestions.extend(self.generate_implementation_suggestions(feature));
+        suggestions.extend(self.generate_testing_suggestions(feature));
+        suggestions.extend(self.generate_documentation_suggestions(feature));
+
+        // Add context-specific suggestions based on feature attributes
+        if feature.priority == Priority::High {
+            suggestions.extend(self.generate_optimization_suggestions(feature));
+        }
+
+        suggestions
+    }
+
+    fn generate_implementation_suggestions(&self, feature: &Feature) -> Vec<FeatureSuggestion> {
         vec![FeatureSuggestion {
+            id: format!("{}-impl-1", feature.id),
             suggestion_type: SuggestionType::Implementation,
+            content: format!(
+                "Recommended implementation approach for feature: {}",
+                feature.name
+            ),
             confidence: 0.8,
-            content: format!("Suggested implementation for feature: {}", feature.name),
+            complexity: 6,
+            impact: SuggestionImpact::High,
+            tags: vec!["design".to_string(), "architecture".to_string()],
+            next_steps: vec![
+                "Create detailed design document".to_string(),
+                "Break down into smaller tasks".to_string(),
+            ],
         }]
+    }
+
+    fn generate_testing_suggestions(&self, feature: &Feature) -> Vec<FeatureSuggestion> {
+        vec![FeatureSuggestion {
+            id: format!("{}-test-1", feature.id),
+            suggestion_type: SuggestionType::Testing,
+            content: "Comprehensive test strategy for feature coverage".to_string(),
+            confidence: 0.7,
+            complexity: 5,
+            impact: SuggestionImpact::Medium,
+            tags: vec!["quality".to_string(), "validation".to_string()],
+            next_steps: vec![
+                "Define unit test cases".to_string(),
+                "Create integration test plan".to_string(),
+            ],
+        }]
+    }
+
+    fn generate_documentation_suggestions(&self, feature: &Feature) -> Vec<FeatureSuggestion> {
+        vec![FeatureSuggestion {
+            id: format!("{}-doc-1", feature.id),
+            suggestion_type: SuggestionType::Documentation,
+            content: "Recommended documentation approach and structure".to_string(),
+            confidence: 0.9,
+            complexity: 3,
+            impact: SuggestionImpact::High,
+            tags: vec!["docs".to_string(), "communication".to_string()],
+            next_steps: vec![
+                "Create user guide".to_string(),
+                "Write technical documentation".to_string(),
+            ],
+        }]
+    }
+
+    // Add placeholder methods for other suggestion types
+    fn generate_optimization_suggestions(&self, _feature: &Feature) -> Vec<FeatureSuggestion> {
+        vec![]
+    }
+
+    fn generate_architecture_suggestions(&self, _feature: &Feature) -> Vec<FeatureSuggestion> {
+        vec![]
+    }
+
+    fn generate_performance_suggestions(&self, _feature: &Feature) -> Vec<FeatureSuggestion> {
+        vec![]
+    }
+
+    fn generate_security_suggestions(&self, _feature: &Feature) -> Vec<FeatureSuggestion> {
+        vec![]
+    }
+
+    fn generate_refactoring_suggestions(&self, _feature: &Feature) -> Vec<FeatureSuggestion> {
+        vec![]
+    }
+
+    fn generate_ux_suggestions(&self, _feature: &Feature) -> Vec<FeatureSuggestion> {
+        vec![]
+    }
+
+    fn filter_suggestions_by_verbosity(
+        &self,
+        suggestions: Vec<FeatureSuggestion>,
+        verbosity: &str,
+    ) -> Vec<FeatureSuggestion> {
+        match verbosity {
+            "low" => suggestions
+                .into_iter()
+                .filter(|s| s.confidence < 0.5)
+                .collect(),
+            "high" => suggestions
+                .into_iter()
+                .filter(|s| s.confidence > 0.7)
+                .collect(),
+            _ => suggestions, // Normal/default verbosity
+        }
     }
 }
 
@@ -371,9 +501,26 @@ pub struct FeatureUpdateRequest {
     pub acceptance_criteria: Option<Vec<String>>,
 }
 
-/// Suggestion for feature implementation
+/// Types of feature suggestions
+#[derive(Debug, Serialize, Deserialize, Clone, ValueEnum)]
+pub enum SuggestionType {
+    Implementation,
+    Testing,
+    Optimization,
+    Documentation,
+    Architecture,
+    Performance,
+    Security,
+    Refactoring,
+    UserExperience,
+}
+
+/// Detailed suggestion for feature implementation
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FeatureSuggestion {
+    /// Unique identifier for the suggestion
+    pub id: String,
+
     /// Type of suggestion
     pub suggestion_type: SuggestionType,
 
@@ -382,15 +529,27 @@ pub struct FeatureSuggestion {
 
     /// Confidence level of the suggestion
     pub confidence: f32,
+
+    /// Estimated complexity (1-10 scale)
+    pub complexity: u8,
+
+    /// Potential impact of the suggestion
+    pub impact: SuggestionImpact,
+
+    /// Related tags or keywords
+    pub tags: Vec<String>,
+
+    /// Recommended next steps
+    pub next_steps: Vec<String>,
 }
 
-/// Types of feature suggestions
-#[derive(Debug, Serialize, Deserialize)]
-pub enum SuggestionType {
-    Implementation,
-    Testing,
-    Optimization,
-    Documentation,
+/// Impact level of a suggestion
+#[derive(Debug, Serialize, Deserialize, Clone, ValueEnum)]
+pub enum SuggestionImpact {
+    Low,
+    Medium,
+    High,
+    Critical,
 }
 
 #[cfg(test)]

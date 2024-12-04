@@ -242,6 +242,28 @@ pub enum FeatureOperation {
         /// Feature ID
         id: String,
     },
+
+    /// Generate intelligent suggestions for a feature
+    Suggest {
+        /// Feature ID to generate suggestions for
+        id: String,
+
+        /// Type of suggestion to generate
+        #[arg(short, long, value_enum)]
+        suggestion_type: Option<features::SuggestionType>,
+
+        /// Verbosity of suggestions
+        #[arg(short, long, default_value = "normal")]
+        verbosity: String,
+
+        /// Output format for suggestions
+        #[arg(long, value_enum, default_value_t = HowtoOutputFormat::Terminal)]
+        output: HowtoOutputFormat,
+
+        /// Save suggestions to a file
+        #[arg(long)]
+        save_path: Option<PathBuf>,
+    },
 }
 
 /// Design operations for project architecture

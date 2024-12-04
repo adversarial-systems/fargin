@@ -39,9 +39,6 @@ impl fmt::Display for FeatureStatus {
 ///     let checker = ProjectChecker::new(project_root);
 ///
 ///     // Run comprehensive project checks
-///     checker.run_project_checks()?;
-///
-///     // Generate detailed health report
 ///     let health_report = checker.run_all_checks()?;
 ///     println!("{}", health_report.generate_report());
 ///     Ok(())
@@ -132,6 +129,33 @@ impl fmt::Display for FeatureStatus {
 ///     
 ///     let doc = generator.generate()?;
 ///     println!("{}", doc);
+///     Ok(())
+/// }
+/// ```
+///
+/// ## Example: Project Progress and Next Steps
+#[allow(clippy::empty_line_after_doc_comments)]
+/// ```rust
+/// use std::path::Path;
+/// use fargin::check::ProjectChecker;
+///
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let project_root = Path::new(".");
+///     let checker = ProjectChecker::new(project_root);
+///
+///     // Run comprehensive project checks
+///     let report = checker.run_all_checks()?;
+///
+///     // Generate detailed health report
+///     println!("{}", report.generate_report());
+///
+///     // Get AI-powered recommendations for next steps
+///     let next_steps = checker.generate_next_steps(&report);
+///     println!("Recommended Next Steps:");
+///     for (i, step) in next_steps.iter().enumerate() {
+///         println!("{}. {}", i + 1, step);
+///     }
+///
 ///     Ok(())
 /// }
 /// ```

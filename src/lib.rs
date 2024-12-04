@@ -136,6 +136,84 @@ pub fn run() -> Result<()> {
                     println!("Feature {} deleted successfully", id);
                     Ok(())
                 }
+                FeatureOperation::Suggest {
+                    id,
+                    suggestion_type,
+                    verbosity,
+                    output,
+                    save_path,
+                } => {
+                    // Retrieve the feature
+                    let feature = feature_manager
+                        .get_feature(&id)
+                        .ok_or_else(|| anyhow::anyhow!("Feature not found"))?;
+
+                    // Generate suggestions
+                    let suggestions = feature_manager.generate_feature_suggestions(
+                        feature,
+                        suggestion_type,
+                        &verbosity,
+                    );
+
+                    // Output suggestions based on format
+                    match output {
+                        cli::HowtoOutputFormat::Terminal => {
+                            let formatted_suggestions = suggestions
+                                .iter()
+                                .map(|s| format!("{:?}: {}", s.suggestion_type, s.content))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            println!("{}", formatted_suggestions);
+                        }
+                        cli::HowtoOutputFormat::Markdown => {
+                            let formatted_suggestions = suggestions.iter()
+                                .map(|s| format!("### {:?} Suggestion\n\n{}\n\n**Impact**: {:?}\n**Complexity**: {}", 
+                                    s.suggestion_type, s.content, s.complexity, s.confidence))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            println!("{}", formatted_suggestions);
+                        }
+                        cli::HowtoOutputFormat::Html => {
+                            let formatted_suggestions = suggestions.iter()
+                                .map(|s| format!("<div class='suggestion'><h3>{:?} Suggestion</h3><p>{}</p><p><strong>Impact</strong>: {:?}</p><p><strong>Complexity</strong>: {}</p></div>", 
+                                    s.suggestion_type, s.content, s.complexity, s.confidence))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            println!("{}", formatted_suggestions);
+                        }
+                    }
+
+                    // Save to file if path provided
+                    if let Some(path) = save_path {
+                        let formatted_suggestions = match output {
+                            cli::HowtoOutputFormat::Terminal => {
+                                suggestions.iter()
+                                    .map(|s| format!("{:?}: {}", s.suggestion_type, s.content))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            },
+                            cli::HowtoOutputFormat::Markdown => {
+                                suggestions.iter()
+                                    .map(|s| format!("### {:?} Suggestion\n\n{}\n\n**Impact**: {:?}\n**Complexity**: {}", 
+                                        s.suggestion_type, s.content, s.complexity, s.confidence))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            },
+                            cli::HowtoOutputFormat::Html => {
+                                suggestions.iter()
+                                    .map(|s| format!("<div class='suggestion'><h3>{:?} Suggestion</h3><p>{}</p><p><strong>Impact</strong>: {:?}</p><p><strong>Complexity</strong>: {}</p></div>", 
+                                        s.suggestion_type, s.content, s.complexity, s.confidence))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            },
+                        };
+
+                        std::fs::write(&path, formatted_suggestions)?;
+                        println!("Suggestions saved to {}", path.display());
+                    }
+
+                    Ok(())
+                }
             }
         }
         Commands::Design { operation, path: _ } => {
@@ -300,16 +378,32 @@ pub fn run() -> Result<()> {
                     path: _,
                 } => {
                     let project_checker = ProjectChecker::new(project_path.as_path());
+                    let project_report = project_checker.run_all_checks()?;
                     let progress_summary = project_checker.generate_progress_summary(&verbosity)?;
+
+                    // Generate next steps
+                    let next_steps = project_checker.generate_next_steps(&project_report);
+                    let next_steps_summary = next_steps
+                        .iter()
+                        .enumerate()
+                        .map(|(i, step)| format!("{}. {}", i + 1, step))
+                        .collect::<Vec<String>>()
+                        .join("\n");
+
+                    // Combine progress summary with next steps
+                    let full_summary = format!(
+                        "{}\n\n🔮 Recommended Next Steps:\n{}\n",
+                        progress_summary, next_steps_summary
+                    );
 
                     // Apply output formatting
                     let formatted_summary = match output {
-                        HowtoOutputFormat::Terminal => progress_summary,
+                        HowtoOutputFormat::Terminal => full_summary,
                         HowtoOutputFormat::Markdown => {
-                            format!("```markdown\n{}\n```", progress_summary)
+                            format!("```markdown\n{}\n```", full_summary)
                         }
                         HowtoOutputFormat::Html => {
-                            format!("<pre>{}</pre>", progress_summary)
+                            format!("<pre>{}</pre>", full_summary)
                         }
                     };
 
