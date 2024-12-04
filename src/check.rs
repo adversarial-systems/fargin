@@ -262,6 +262,153 @@ impl ProjectChecker {
             branch_name: Some("main".to_string()),
         })
     }
+
+    /// Generate a comprehensive project progress summary
+    pub fn generate_progress_summary(&self, verbosity: &str) -> Result<String> {
+        let health_report = self.run_all_checks()?;
+
+        // Determine verbosity level
+        let summary = match verbosity {
+            "high" => self.generate_detailed_progress_summary(&health_report),
+            "low" => self.generate_brief_progress_summary(&health_report),
+            _ => self.generate_standard_progress_summary(&health_report),
+        };
+
+        Ok(summary)
+    }
+
+    fn generate_brief_progress_summary(&self, report: &ProjectHealthReport) -> String {
+        format!(
+            "Project Progress Summary:\n\
+            - Features: {} total ({} implemented)\n\
+            - Dependencies: {} total\n\
+            - Git Status: {}\n",
+            report.feature_health.total_features,
+            report
+                .feature_health
+                .status_distribution
+                .get(&FeatureStatus::Implemented)
+                .cloned()
+                .unwrap_or(0),
+            report.dependency_health.total_dependencies,
+            if report.git_health.is_git_repo {
+                "✅ Healthy"
+            } else {
+                "❌ Not a Git Repo"
+            }
+        )
+    }
+
+    fn generate_standard_progress_summary(&self, report: &ProjectHealthReport) -> String {
+        let feature_summary = report.feature_health.status_distribution.iter().fold(
+            String::new(),
+            |mut acc, (status, count)| {
+                acc.push_str(&format!("  - {}: {}\n", status, count));
+                acc
+            },
+        );
+
+        format!(
+            "🚀 Project Progress Summary 🚀\n\n\
+            Feature Health:\n\
+            Total Features: {}\n\
+            Feature Status Distribution:\n{}\
+            Stale Features: {}\n\n\
+            Dependency Health:\n\
+            Total Dependencies: {}\n\
+            Outdated Dependencies: {}\n\n\
+            Git Repository Health:\n\
+            Is Git Repository: {}\n\
+            Current Branch: {}\n\
+            Uncommitted Changes: {}\n\
+            Unpushed Commits: {}\n",
+            report.feature_health.total_features,
+            feature_summary,
+            report.feature_health.stale_features.join(", "),
+            report.dependency_health.total_dependencies,
+            report.dependency_health.outdated_dependencies.len(),
+            report.git_health.is_git_repo,
+            report
+                .git_health
+                .branch_name
+                .clone()
+                .unwrap_or_else(|| "Unknown".to_string()),
+            report.git_health.uncommitted_changes,
+            report.git_health.unpushed_commits
+        )
+    }
+
+    fn generate_detailed_progress_summary(&self, report: &ProjectHealthReport) -> String {
+        let feature_summary = report.feature_health.status_distribution.iter().fold(
+            String::new(),
+            |mut acc, (status, count)| {
+                acc.push_str(&format!("  - {}: {}\n", status, count));
+                acc
+            },
+        );
+
+        let stale_features_details =
+            report
+                .feature_health
+                .stale_features
+                .iter()
+                .fold(String::new(), |mut acc, feature| {
+                    acc.push_str(&format!("  - {}\n", feature));
+                    acc
+                });
+
+        let outdated_dependencies_details = report
+            .dependency_health
+            .outdated_dependencies
+            .iter()
+            .fold(String::new(), |mut acc, dep| {
+                acc.push_str(&format!("  - {}\n", dep));
+                acc
+            });
+
+        format!(
+            "🌟 Comprehensive Project Progress Summary 🌟\n\n\
+            🔍 Feature Health:\n\
+            Total Features: {}\n\
+            Feature Status Distribution:\n{}\
+            Stale Features (>30 days):\n{}\n\
+            Potential Actions:\n\
+              - Review and update stale features\n\
+              - Close or reactivate inactive features\n\n\
+            📦 Dependency Health:\n\
+            Total Dependencies: {}\n\
+            Outdated Dependencies:\n{}\
+            Potential Actions:\n\
+              - Update dependencies to latest versions\n\
+              - Review security and compatibility\n\n\
+            🌳 Git Repository Health:\n\
+            Is Git Repository: {}\n\
+            Current Branch: {}\n\
+            Uncommitted Changes: {}\n\
+            Unpushed Commits: {}\n\
+            Potential Actions:\n\
+              - Commit or stash uncommitted changes\n\
+              - Push local commits to remote\n\
+              - Consider creating feature branches\n\n\
+            💡 Recommendations:\n\
+              1. Prioritize features with 'Blocked' or 'InProgress' status\n\
+              2. Address stale features and outdated dependencies\n\
+              3. Maintain consistent Git workflow\n",
+            report.feature_health.total_features,
+            feature_summary,
+            stale_features_details,
+            report.dependency_health.total_dependencies,
+            outdated_dependencies_details,
+            report.git_health.is_git_repo,
+            report
+                .git_health
+                .branch_name
+                .clone()
+                .unwrap_or_else(|| "Unknown".to_string()),
+            report.git_health.uncommitted_changes,
+            report.git_health.unpushed_commits
+        )
+    }
 }
 
 /// Comprehensive project health report

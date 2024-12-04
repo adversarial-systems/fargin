@@ -5,7 +5,10 @@ pub mod features;
 pub mod howto;
 
 use crate::check::ProjectChecker;
-use crate::cli::{CheckOperation, Cli, Commands, DesignOperation, FeatureOperation, InitOperation};
+use crate::cli::{
+    CheckOperation, Cli, Commands, DesignOperation, FeatureOperation, HowtoOutputFormat,
+    InitOperation,
+};
 use anyhow::Result;
 use clap::Parser;
 
@@ -289,6 +292,28 @@ pub fn run() -> Result<()> {
                     );
                     println!("Uncommitted Changes: {}", git_report.uncommitted_changes);
                     println!("Unpushed Commits: {}", git_report.unpushed_commits);
+                    Ok(())
+                }
+                CheckOperation::Progress {
+                    verbosity,
+                    output,
+                    path: _,
+                } => {
+                    let project_checker = ProjectChecker::new(project_path.as_path());
+                    let progress_summary = project_checker.generate_progress_summary(&verbosity)?;
+
+                    // Apply output formatting
+                    let formatted_summary = match output {
+                        HowtoOutputFormat::Terminal => progress_summary,
+                        HowtoOutputFormat::Markdown => {
+                            format!("```markdown\n{}\n```", progress_summary)
+                        }
+                        HowtoOutputFormat::Html => {
+                            format!("<pre>{}</pre>", progress_summary)
+                        }
+                    };
+
+                    println!("{}", formatted_summary);
                     Ok(())
                 }
             }

@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-fargin = {  version = "0.1.60" }
+fargin = {  version = "0.1.61" }
 anyhow = "1.0"
 tokio = { version = "1.0", features = ["full"] }

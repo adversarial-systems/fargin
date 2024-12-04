@@ -462,6 +462,28 @@ fn main() -> Result<()> {
 
                     Ok(())
                 }
+                CheckOperation::Progress {
+                    verbosity,
+                    output,
+                    path,
+                } => {
+                    let project_checker = fargin::check::ProjectChecker::new(path.as_path());
+                    let progress_summary = project_checker.generate_progress_summary(&verbosity)?;
+
+                    // Apply output formatting
+                    let formatted_summary = match output {
+                        fargin::cli::HowtoOutputFormat::Terminal => progress_summary,
+                        fargin::cli::HowtoOutputFormat::Markdown => {
+                            format!("```markdown\n{}\n```", progress_summary)
+                        }
+                        fargin::cli::HowtoOutputFormat::Html => {
+                            format!("<pre>{}</pre>", progress_summary)
+                        }
+                    };
+
+                    println!("{}", formatted_summary);
+                    Ok(())
+                }
             }
         }
         Commands::Howto {

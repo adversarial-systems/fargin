@@ -318,6 +318,21 @@ pub enum CheckOperation {
 
     /// Check Git repository status
     Git,
+
+    /// Evaluate and generate a comprehensive project progress summary
+    Progress {
+        /// Verbosity of the progress summary
+        #[arg(short, long, default_value = "normal")]
+        verbosity: String,
+
+        /// Output format for the progress summary
+        #[arg(long, value_enum, default_value_t = HowtoOutputFormat::Terminal)]
+        output: HowtoOutputFormat,
+
+        /// Project path (default: current directory)
+        #[arg(short, long, default_value = ".", value_name = "PROJECT_PATH")]
+        path: PathBuf,
+    },
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
