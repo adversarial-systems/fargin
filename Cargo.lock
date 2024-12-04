@@ -353,7 +353,7 @@ dependencies = [
 
 [[package]]
 name = "fargin"
-version = "0.1.57"
+version = "0.1.57alpha"
 dependencies = [
  "anyhow",
  "assert_fs",
